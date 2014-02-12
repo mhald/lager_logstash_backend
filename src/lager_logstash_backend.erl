@@ -22,6 +22,7 @@
                 logstash_host :: string(),
                 logstash_port :: number(),
                 logstash_address :: inet:ip_address(),
+                node_name :: string(),
                 node_role :: string(),
                 node_version :: string(),
                 metadata :: list()
@@ -45,6 +46,7 @@ init(Params) ->
   Level = lager_util:level_to_num(proplists:get_value(level, Params, debug)),
   Popcorn_Host = proplists:get_value(logstash_host, Params, "localhost"),
   Popcorn_Port = proplists:get_value(logstash_port, Params, 9125),
+  Node_Name = proplists:get_value(node_name, Params, "no_name"),
   Node_Role = proplists:get_value(node_role, Params, "no_role"),
   Node_Version = proplists:get_value(node_version, Params, "no_version"),
 
@@ -71,6 +73,7 @@ init(Params) ->
               logstash_host = Popcorn_Host,
               logstash_port = Popcorn_Port,
               logstash_address = Address,
+              node_name = Node_Name,
               node_role = Node_Role,
               node_version = Node_Version,
               metadata = Metadata}}.
@@ -94,6 +97,7 @@ handle_event({log, {lager_msg, _, Metadata, Severity, {Date, Time}, Message}}, #
     true ->
       Encoded_Message = encode_json_event(State#state.lager_level_type,
                                                   node(),
+                                                  State#state.node_name,
                                                   State#state.node_role,
                                                   State#state.node_version,
                                                   Severity,
@@ -127,13 +131,14 @@ code_change(_OldVsn, State, _Extra) ->
   Vsn = get_app_version(),
   {ok, State#state{node_version=Vsn}}.
 
-encode_json_event('mask', Node, Node_Role, Node_Version, Severity, _Date, _Time, Message, Metadata) ->
+encode_json_event('mask', Node, Node_Name, Node_Role, Node_Version, Severity, _Date, _Time, Message, Metadata) ->
   jiffy:encode({[
                 {<<"fields">>, 
                     {[
                         {<<"level">>, Severity},
-                        {<<"role">>, list_to_binary(Node_Role)},
-                        {<<"role_version">>, list_to_binary(Node_Version)},
+                        {<<"node_name">>, list_to_binary(Node_Name)},
+                        {<<"node_role">>, list_to_binary(Node_Role)},
+                        {<<"node_version">>, list_to_binary(Node_Version)},
                         {<<"node">>, Node}
                     ] ++ Metadata }
                 },
